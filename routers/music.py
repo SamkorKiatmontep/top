@@ -14,14 +14,8 @@ def search_songs(q: str):
     result = []
     for i in music:
         if q.lower() in i['title'].lower() or q.lower() in i['artist'].lower():
-            result.append(i)
-    
-    if not result:
-        return {"message": f"{q} не найден", "results": []}
-    
+            result.append(i)    
     return result
-
-
 
 @router.post('/', status_code=201,response_model=MusicResponse)
 def add_song(song:MusicCreate):
