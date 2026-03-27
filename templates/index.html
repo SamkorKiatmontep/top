@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Музыкальный плеер</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        h2 {
+            color: #666;
+            margin-top: 20px;
+        }
+        input {
+            padding: 8px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            padding: 8px 15px;
+            margin: 5px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .delete-btn {
+            background-color: #f44336;
+            margin-left: 10px;
+        }
+        .delete-btn:hover {
+            background-color: #da190b;
+        }
+        ul {
+            list-style: none;
+            padding: 0;
+        }
+        li {
+            background-color: white;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .search-results {
+            background-color: #e3f2fd;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎵 Музыкальный плеер</h1>
+    
+    <!-- Форма добавления -->
+    <h2>➕ Добавить трек</h2>
+    <input type="text" id="title" placeholder="Название песни">
+    <input type="text" id="artist" placeholder="Исполнитель">
+    <button onclick="addSong()">Добавить</button>
+    
+    <!-- Поиск -->
+    <h2>🔍 Поиск</h2>
+    <input type="text" id="searchInput" placeholder="Введите название или исполнителя">
+    <button onclick="searchMusic()">Найти</button>
+    <button onclick="clearSearch()">Очистить</button>
+    <div id="searchResults" class="search-results"></div>
+    
+    <!-- Список всех треков -->
+    <h2>📋 Все треки</h2>
+    <ul id="songs"></ul>
+    
+    <script>
+        // Загрузить все треки при открытии страницы
+        loadSongs();
+        
+        // Получить все треки
+        async function loadSongs() {
+            const response = await fetch('/music');
+            const songs = await response.json();
+            
+            const list = document.getElementById('songs');
+            list.innerHTML = '';
+            
+            if (songs.length === 0) {
+                list.innerHTML = '<li>Нет треков. Добавьте первый!</li>';
+                return;
+            }
+            
+            songs.forEach(song => {
+                const li = document.createElement('li');
+                li.innerHTML = `
+                    <span><strong>${song.title}</strong> - ${song.artist}</span>
+                    <button class="delete-btn" onclick="deleteSong(${song.id})">Удалить</button>
+                `;
+                list.appendChild(li);
+            });
+        }
+        
+        // Добавить трек
+        async function addSong() {
+            const title = document.getElementById('title').value;
+            const artist = document.getElementById('artist').value;
+            
+            if (!title || !artist) {
+                alert('Заполните оба поля!');
+                return;
+            }
+            
+            const response = await fetch('/music', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({title, artist})
+            });
+            
+            if (response.ok) {
+                document.getElementById('title').value = '';
+                document.getElementById('artist').value = '';
+                loadSongs();
+                clearSearch();
+            } else {
+                alert('Ошибка при добавлении');
+            }
+        }
+        
+        // Удалить трек
+        async function deleteSong(id) {
+            if (confirm('Удалить трек?')) {
+                await fetch(`/music/${id}`, {method: 'DELETE'});
+                loadSongs();
+                clearSearch();
+            }
+        }
+        
+        // Поиск треков
+        async function searchMusic() {
+            const q = document.getElementById('searchInput').value;
+            
+            if (!q.trim()) {
+                alert('Введите текст для поиска');
+                return;
+            }
+            
+            const response = await fetch(`/music/search?q=${q}`);
+            const result = await response.json();
+            
+            const resultsDiv = document.getElementById('searchResults');
+            
+            // Если сервер вернул объект с message (ничего не найдено)
+            if (result.message) {
+                resultsDiv.innerHTML = `<p>${result.message}</p>`;
+                return;
+            }
+            
+            // Если результат — массив
+            if (result.length === 0) {
+                resultsDiv.innerHTML = '<p>❌ Ничего не найдено</p>';
+                return;
+            }
+            
+            // Показать результаты поиска
+            let html = '<h3>Результаты поиска:</h3><ul>';
+            result.forEach(song => {
+                html += `<li><strong>${song.title}</strong> - ${song.artist}</li>`;
+            });
+            html += '</ul>';
+            resultsDiv.innerHTML = html;
+        }
+        
+        // Очистить поиск
+        function clearSearch() {
+            document.getElementById('searchInput').value = '';
+            document.getElementById('searchResults').innerHTML = '';
+        }
+    </script>
+</body>
+</html>
