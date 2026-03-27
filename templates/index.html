@@ -19,19 +19,21 @@
             margin-top: 20px;
         }
         input {
-            padding: 8px;
+            padding: 10px;
             margin: 5px;
             border: 1px solid #ddd;
             border-radius: 4px;
+            font-size: 14px;
         }
         button {
-            padding: 8px 15px;
+            padding: 10px 15px;
             margin: 5px;
             background-color: #4CAF50;
             color: white;
             border: none;
             border-radius: 4px;
             cursor: pointer;
+            font-size: 14px;
         }
         button:hover {
             background-color: #45a049;
@@ -43,24 +45,43 @@
         .delete-btn:hover {
             background-color: #da190b;
         }
+        .clear-btn {
+            background-color: #ff9800;
+        }
+        .clear-btn:hover {
+            background-color: #e68900;
+        }
         ul {
             list-style: none;
             padding: 0;
         }
         li {
             background-color: white;
-            padding: 10px;
-            margin: 5px 0;
+            padding: 12px;
+            margin: 8px 0;
             border-radius: 4px;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
         }
         .search-results {
             background-color: #e3f2fd;
             padding: 10px;
             border-radius: 4px;
             margin: 10px 0;
+        }
+        .search-results li {
+            background-color: #fff;
+            margin: 5px 0;
+            padding: 8px;
+        }
+        .song-title {
+            font-weight: bold;
+        }
+        .song-artist {
+            color: #666;
+            font-size: 14px;
         }
     </style>
 </head>
@@ -73,11 +94,10 @@
     <input type="text" id="artist" placeholder="Исполнитель">
     <button onclick="addSong()">Добавить</button>
     
-    <!-- Поиск -->
+    <!-- Поиск (автоматический) -->
     <h2>🔍 Поиск</h2>
-    <input type="text" id="searchInput" placeholder="Введите название или исполнителя">
-    <button onclick="searchMusic()">Найти</button>
-    <button onclick="clearSearch()">Очистить</button>
+    <input type="text" id="searchInput" placeholder="Начните вводить название или исполнителя..." oninput="searchMusic()">
+    <button onclick="clearSearch()" class="clear-btn">Очистить</button>
     <div id="searchResults" class="search-results"></div>
     
     <!-- Список всех треков -->
@@ -85,6 +105,8 @@
     <ul id="songs"></ul>
     
     <script>
+        let searchTimeout;
+        
         // Загрузить все треки при открытии страницы
         loadSongs();
         
@@ -97,15 +119,18 @@
             list.innerHTML = '';
             
             if (songs.length === 0) {
-                list.innerHTML = '<li>Нет треков. Добавьте первый!</li>';
+                list.innerHTML = '<li>📭 Нет треков. Добавьте первый!</li>';
                 return;
             }
             
             songs.forEach(song => {
                 const li = document.createElement('li');
                 li.innerHTML = `
-                    <span><strong>${song.title}</strong> - ${song.artist}</span>
-                    <button class="delete-btn" onclick="deleteSong(${song.id})">Удалить</button>
+                    <div>
+                        <span class="song-title">${escapeHtml(song.title)}</span>
+                        <span class="song-artist"> - ${escapeHtml(song.artist)}</span>
+                    </div>
+                    <button class="delete-btn" onclick="deleteSong(${song.id})">🗑 Удалить</button>
                 `;
                 list.appendChild(li);
             });
@@ -113,8 +138,8 @@
         
         // Добавить трек
         async function addSong() {
-            const title = document.getElementById('title').value;
-            const artist = document.getElementById('artist').value;
+            const title = document.getElementById('title').value.trim();
+            const artist = document.getElementById('artist').value.trim();
             
             if (!title || !artist) {
                 alert('Заполните оба поля!');
@@ -139,52 +164,72 @@
         
         // Удалить трек
         async function deleteSong(id) {
-            if (confirm('Удалить трек?')) {
+            if (confirm('Удалить этот трек?')) {
                 await fetch(`/music/${id}`, {method: 'DELETE'});
                 loadSongs();
                 clearSearch();
             }
         }
         
-        // Поиск треков
+        // Поиск при вводе (с задержкой)
         async function searchMusic() {
-            const q = document.getElementById('searchInput').value;
+            clearTimeout(searchTimeout);
             
-            if (!q.trim()) {
-                alert('Введите текст для поиска');
-                return;
-            }
-            
-            const response = await fetch(`/music/search?q=${q}`);
-            const result = await response.json();
-            
-            const resultsDiv = document.getElementById('searchResults');
-            
-            // Если сервер вернул объект с message (ничего не найдено)
-            if (result.message) {
-                resultsDiv.innerHTML = `<p>${result.message}</p>`;
-                return;
-            }
-            
-            // Если результат — массив
-            if (result.length === 0) {
-                resultsDiv.innerHTML = '<p>❌ Ничего не найдено</p>';
-                return;
-            }
-            
-            // Показать результаты поиска
-            let html = '<h3>Результаты поиска:</h3><ul>';
-            result.forEach(song => {
-                html += `<li><strong>${song.title}</strong> - ${song.artist}</li>`;
-            });
-            html += '</ul>';
-            resultsDiv.innerHTML = html;
+            searchTimeout = setTimeout(async () => {
+                const q = document.getElementById('searchInput').value.trim();
+                const resultsDiv = document.getElementById('searchResults');
+                
+                if (!q) {
+                    resultsDiv.innerHTML = '';
+                    return;
+                }
+                
+                try {
+                    const response = await fetch(`/music/search?q=${encodeURIComponent(q)}`);
+                    const result = await response.json();
+                    
+                    if (result.message) {
+                        resultsDiv.innerHTML = `<p>${result.message}</p>`;
+                        return;
+                    }
+                    
+                    if (result.length === 0) {
+                        resultsDiv.innerHTML = '<p>❌ Ничего не найдено</p>';
+                        return;
+                    }
+                    
+                    let html = '<h3>🎯 Результаты поиска:</h3><ul>';
+                    result.forEach(song => {
+                        html += `
+                            <li>
+                                <div>
+                                    <span class="song-title">${escapeHtml(song.title)}</span>
+                                    <span class="song-artist"> - ${escapeHtml(song.artist)}</span>
+                                </div>
+                            </li>
+                        `;
+                    });
+                    html += '</ul>';
+                    resultsDiv.innerHTML = html;
+                    
+                } catch (error) {
+                    console.error('Ошибка поиска:', error);
+                    resultsDiv.innerHTML = '<p>⚠️ Ошибка при поиске</p>';
+                }
+            }, 300);
         }
         
         // Очистить поиск
         function clearSearch() {
             document.getElementById('searchInput').value = '';
             document.getElementById('searchResults').innerHTML = '';
+        }
+        
+        // Защита от XSS
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
         }
     </script>
 </body>
