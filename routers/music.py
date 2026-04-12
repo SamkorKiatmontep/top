@@ -1,11 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from models import MusicCreate, MusicResponse
-from database import new_session, MusicModel, setup_database
+from database import new_session, MusicModel
 from sqlalchemy import select
-import asyncio
-
-# Создаём таблицу при запуске
-asyncio.run(setup_database())
 
 router = APIRouter()
 
