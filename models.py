@@ -8,3 +8,4 @@ class MusicResponse(BaseModel):
     id:int
     title:str
     artist:str
+    file_path:str = ''

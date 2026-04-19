@@ -45,11 +45,12 @@
         .delete-btn:hover {
             background-color: #da190b;
         }
-        .clear-btn {
-            background-color: #ff9800;
+        .play-btn {
+            background-color: #2196F3;
+            margin-right: 10px;
         }
-        .clear-btn:hover {
-            background-color: #e68900;
+        .play-btn:hover {
+            background-color: #0b7dda;
         }
         ul {
             list-style: none;
@@ -65,16 +66,10 @@
             align-items: center;
             box-shadow: 0 1px 3px rgba(0,0,0,0.1);
         }
-        .search-results {
-            background-color: #e3f2fd;
-            padding: 10px;
-            border-radius: 4px;
-            margin: 10px 0;
-        }
-        .search-results li {
-            background-color: #fff;
-            margin: 5px 0;
-            padding: 8px;
+        .song-info {
+            flex: 1;
+            display: flex;
+            align-items: center;
         }
         .song-title {
             font-weight: bold;
@@ -82,6 +77,48 @@
         .song-artist {
             color: #666;
             font-size: 14px;
+            margin-left: 10px;
+        }
+        .player {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background-color: #333;
+            color: white;
+            padding: 15px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.2);
+        }
+        .player button {
+            background-color: #555;
+            font-size: 18px;
+            padding: 10px 20px;
+        }
+        .player button:hover {
+            background-color: #777;
+        }
+        .now-playing {
+            margin-left: 20px;
+            font-size: 14px;
+        }
+        audio {
+            margin-left: 20px;
+        }
+        .search-results {
+            background-color: #e3f2fd;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .clear-btn {
+            background-color: #ff9800;
+        }
+        .clear-btn:hover {
+            background-color: #e68900;
         }
     </style>
 </head>
@@ -94,39 +131,52 @@
     <input type="text" id="artist" placeholder="Исполнитель">
     <button onclick="addSong()">Добавить</button>
     
-    <!-- Поиск (автоматический) -->
+    <!-- Поиск -->
     <h2>🔍 Поиск</h2>
-    <input type="text" id="searchInput" placeholder="Начните вводить название или исполнителя..." oninput="searchMusic()">
+    <input type="text" id="searchInput" placeholder="Начните вводить..." oninput="searchMusic()">
     <button onclick="clearSearch()" class="clear-btn">Очистить</button>
     <div id="searchResults" class="search-results"></div>
     
-    <!-- Список всех треков -->
+    <!-- Список треков -->
     <h2>📋 Все треки</h2>
     <ul id="songs"></ul>
     
+    <!-- Аудиоплеер -->
+    <div class="player" id="player" style="display: none;">
+        <button onclick="prevSong()">⏮ Предыдущий</button>
+        <button onclick="playCurrentSong()" id="playBtn">▶ Play</button>
+        <button onclick="pauseCurrentSong()" id="pauseBtn">⏸ Pause</button>
+        <button onclick="nextSong()">Следующий ⏭</button>
+        <div class="now-playing" id="nowPlaying"></div>
+        <audio id="audioPlayer" controls style="width: 300px;"></audio>
+    </div>
+
     <script>
-        let searchTimeout;
+        let currentSongs = [];
+        let currentIndex = 0;
         
-        // Загрузить все треки при открытии страницы
-        loadSongs();
-        
-        // Получить все треки
+        // Загрузить все треки
         async function loadSongs() {
             const response = await fetch('/music');
             const songs = await response.json();
+            currentSongs = songs;
             
             const list = document.getElementById('songs');
             list.innerHTML = '';
             
             if (songs.length === 0) {
                 list.innerHTML = '<li>📭 Нет треков. Добавьте первый!</li>';
+                document.getElementById('player').style.display = 'none';
                 return;
             }
             
-            songs.forEach(song => {
+            document.getElementById('player').style.display = 'flex';
+            
+            songs.forEach((song, index) => {
                 const li = document.createElement('li');
                 li.innerHTML = `
-                    <div>
+                    <div class="song-info">
+                        <button class="play-btn" onclick="playSong(${index})">▶</button>
                         <span class="song-title">${escapeHtml(song.title)}</span>
                         <span class="song-artist"> - ${escapeHtml(song.artist)}</span>
                     </div>
@@ -134,6 +184,51 @@
                 `;
                 list.appendChild(li);
             });
+        }
+        
+        // Воспроизвести выбранный трек
+        function playSong(index) {
+            currentIndex = index;
+            const song = currentSongs[index];
+            const audio = document.getElementById('audioPlayer');
+            
+            // 👇 ГЛАВНОЕ ИЗМЕНЕНИЕ: берем путь к файлу из базы данных
+            audio.src = song.file_path;
+            
+            audio.play();
+            document.getElementById('nowPlaying').innerHTML = `🎵 ${song.title} - ${song.artist}`;
+            document.getElementById('playBtn').style.display = 'none';
+            document.getElementById('pauseBtn').style.display = 'inline-block';
+        }
+        
+        function playCurrentSong() {
+            const audio = document.getElementById('audioPlayer');
+            audio.play();
+            document.getElementById('playBtn').style.display = 'none';
+            document.getElementById('pauseBtn').style.display = 'inline-block';
+        }
+        
+        function pauseCurrentSong() {
+            const audio = document.getElementById('audioPlayer');
+            audio.pause();
+            document.getElementById('playBtn').style.display = 'inline-block';
+            document.getElementById('pauseBtn').style.display = 'none';
+        }
+        
+        function nextSong() {
+            if (currentIndex < currentSongs.length - 1) {
+                playSong(currentIndex + 1);
+            } else {
+                playSong(0);
+            }
+        }
+        
+        function prevSong() {
+            if (currentIndex > 0) {
+                playSong(currentIndex - 1);
+            } else {
+                playSong(currentSongs.length - 1);
+            }
         }
         
         // Добавить трек
@@ -171,10 +266,10 @@
             }
         }
         
-        // Поиск при вводе (с задержкой)
+        // Поиск
+        let searchTimeout;
         async function searchMusic() {
             clearTimeout(searchTimeout);
-            
             searchTimeout = setTimeout(async () => {
                 const q = document.getElementById('searchInput').value.trim();
                 const resultsDiv = document.getElementById('searchResults');
@@ -187,11 +282,6 @@
                 try {
                     const response = await fetch(`/music/search?q=${encodeURIComponent(q)}`);
                     const result = await response.json();
-                    
-                    if (result.message) {
-                        resultsDiv.innerHTML = `<p>${result.message}</p>`;
-                        return;
-                    }
                     
                     if (result.length === 0) {
                         resultsDiv.innerHTML = '<p>❌ Ничего не найдено</p>';
@@ -211,26 +301,26 @@
                     });
                     html += '</ul>';
                     resultsDiv.innerHTML = html;
-                    
                 } catch (error) {
                     console.error('Ошибка поиска:', error);
-                    resultsDiv.innerHTML = '<p>⚠️ Ошибка при поиске</p>';
                 }
             }, 300);
         }
         
-        // Очистить поиск
         function clearSearch() {
             document.getElementById('searchInput').value = '';
             document.getElementById('searchResults').innerHTML = '';
+            loadSongs();
         }
         
-        // Защита от XSS
         function escapeHtml(text) {
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
         }
+        
+        // Загружаем треки при открытии страницы
+        loadSongs();
     </script>
 </body>
 </html>

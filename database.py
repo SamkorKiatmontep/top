@@ -17,6 +17,7 @@ class MusicModel(Base):
     id:Mapped[int] = mapped_column(primary_key=True)
     title:Mapped[str]
     artist:Mapped[str]
+    file_path:Mapped[str] = mapped_column(default='')
 
 
 async def setup_database():
